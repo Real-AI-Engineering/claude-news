@@ -169,7 +169,6 @@ keywords:
     - "context window"
 
 scoring:
-  threshold: 0.25
   max_items: 10
 
 retention:

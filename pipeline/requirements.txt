@@ -1,4 +1,3 @@
 fastfeedparser>=0.5
 httpx>=0.28
 pyyaml>=6.0
-trafilatura>=2.0

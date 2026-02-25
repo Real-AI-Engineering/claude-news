@@ -109,12 +109,24 @@ max_items: 10
 #     - "keyword2"
 EOF
     else
-        cat > "$CONFIG_DIR/config.yaml" <<EOF
-# claude-news config — based on "$PRESET" preset
-# Customize by adding/removing feeds and keywords below.
+        # Validate preset name: alphanumeric, hyphens, underscores only
+        if ! [[ "$PRESET" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+            echo "ERROR: Invalid preset name '$PRESET'. Use only letters, numbers, hyphens, underscores."
+            exit 1
+        fi
+        # Validate schedule time: HH:MM format
+        if ! [[ "$SCHEDULE_TIME" =~ ^[0-2][0-9]:[0-5][0-9]$ ]]; then
+            echo "ERROR: Invalid time '$SCHEDULE_TIME'. Use HH:MM format (e.g., 06:00)."
+            exit 1
+        fi
+        cat > "$CONFIG_DIR/config.yaml" <<'ENDOFCONFIG'
+# claude-news config — customize by adding/removing feeds and keywords below.
 version: 1
-preset: "$PRESET"
-schedule_time: "$SCHEDULE_TIME"
+ENDOFCONFIG
+        # Append user-chosen values safely (no shell expansion)
+        printf 'preset: "%s"\n' "$PRESET" >> "$CONFIG_DIR/config.yaml"
+        printf 'schedule_time: "%s"\n' "$SCHEDULE_TIME" >> "$CONFIG_DIR/config.yaml"
+        cat >> "$CONFIG_DIR/config.yaml" <<'ENDOFCONFIG'
 timezone: "local"
 max_items: 10
 
@@ -137,7 +149,7 @@ max_items: 10
 
 # Optional: Tavily API key (free tier, not required)
 # tavily_api_key: ""
-EOF
+ENDOFCONFIG
     fi
     echo "  Config created"
 else

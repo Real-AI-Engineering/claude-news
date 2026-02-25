@@ -28,12 +28,19 @@ _STRIP_PARAMS = {
 }
 
 
+_ALLOWED_SCHEMES = {"http", "https"}
+
+
 def normalize_url(url: str) -> str:
-    """Strip tracker params, trailing slash, force https."""
+    """Strip tracker params, trailing slash, force https. Rejects non-HTTP schemes."""
     parsed = urlparse(url)
 
+    # Reject non-HTTP(S) schemes (javascript:, data:, file://, etc.)
+    if parsed.scheme.lower() not in _ALLOWED_SCHEMES:
+        return ""
+
     # Force https
-    scheme = "https" if parsed.scheme == "http" else parsed.scheme
+    scheme = "https"
 
     # Strip tracker query params; keep everything not in the strip set and not utm_*
     qs = parse_qs(parsed.query, keep_blank_values=True)
@@ -106,10 +113,13 @@ def fetch_rss_feed(feed: dict) -> list[RawItem]:
     items: list[RawItem] = []
 
     try:
-        transport = httpx.HTTPTransport(retries=3)
-        with httpx.Client(timeout=10, transport=transport, follow_redirects=True) as client:
+        with httpx.Client(timeout=10, follow_redirects=True) as client:
             resp = _fetch_with_retry(client, url)
             if resp is None:
+                return []
+            # Guard against oversized responses (10 MB limit)
+            if len(resp.content) > 10 * 1024 * 1024:
+                print(f"[collect] SKIP {source}: response too large ({len(resp.content)} bytes)", file=sys.stderr)
                 return []
             content = resp.text
 
@@ -128,11 +138,16 @@ def fetch_rss_feed(feed: dict) -> list[RawItem]:
                     published = str(val)
                     break
 
+            extra: dict = {}
+            if feed.get("is_release"):
+                extra["is_release"] = True
+
             items.append(RawItem(
                 url=entry_url,
                 title=title.strip(),
                 source=source,
                 published=published,
+                extra=extra,
             ))
     except Exception as exc:
         print(f"[collect] ERROR parsing feed {source} ({url}): {exc}", file=sys.stderr)
@@ -146,8 +161,7 @@ def fetch_hn_stories(min_points: int = 100, limit: int = 200) -> list[RawItem]:
     items: list[RawItem] = []
 
     try:
-        transport = httpx.HTTPTransport(retries=3)
-        with httpx.Client(timeout=10, transport=transport, follow_redirects=True) as client:
+        with httpx.Client(timeout=10, follow_redirects=True) as client:
             resp = _fetch_with_retry(client, api_url)
             if resp is None:
                 return []
@@ -180,9 +194,8 @@ def fetch_tavily(queries: list[str]) -> list[RawItem]:
         return []
 
     items: list[RawItem] = []
-    transport = httpx.HTTPTransport(retries=3)
 
-    with httpx.Client(timeout=10, transport=transport) as client:
+    with httpx.Client(timeout=10) as client:
         for query in queries:
             try:
                 resp = client.post(
@@ -285,9 +298,10 @@ def main() -> None:
 
     items = collect_all(config)
 
-    # Normalize all URLs
+    # Normalize all URLs and drop items with rejected schemes
     for item in items:
         item.url = normalize_url(item.url)
+    items = [item for item in items if item.url]
 
     if args.output:
         output_path = Path(args.output)

@@ -22,6 +22,18 @@ def test_normalize_url_preserves_query_params():
     from pipeline.collect import normalize_url
     assert normalize_url("https://example.com/page?id=123&utm_source=x") == "https://example.com/page?id=123"
 
+def test_normalize_url_rejects_javascript_scheme():
+    from pipeline.collect import normalize_url
+    assert normalize_url("javascript:alert(1)") == ""
+
+def test_normalize_url_rejects_data_scheme():
+    from pipeline.collect import normalize_url
+    assert normalize_url("data:text/html,<h1>hi</h1>") == ""
+
+def test_normalize_url_rejects_file_scheme():
+    from pipeline.collect import normalize_url
+    assert normalize_url("file:///etc/passwd") == ""
+
 def test_item_schema():
     from pipeline.collect import RawItem
     item = RawItem(

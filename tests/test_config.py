@@ -196,6 +196,19 @@ def test_resolve_config_with_overlay(tmp_path, monkeypatch):
 # resolve_config — blank preset
 # ---------------------------------------------------------------------------
 
+def test_resolve_config_rejects_path_traversal(tmp_path, monkeypatch):
+    cfg_dir = tmp_path / "cfg" / "claude-news"
+    cfg_dir.mkdir(parents=True)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+
+    preset_dir = tmp_path / "presets"
+    preset_dir.mkdir()
+
+    from pipeline.config import resolve_config
+    with pytest.raises(ValueError, match="Invalid preset name"):
+        resolve_config(preset_dir=preset_dir, preset_name="../../etc/passwd")
+
+
 def test_resolve_config_blank(tmp_path, monkeypatch):
     cfg_dir = tmp_path / "cfg" / "claude-news"
     cfg_dir.mkdir(parents=True)

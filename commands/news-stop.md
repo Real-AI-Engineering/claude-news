@@ -11,7 +11,9 @@ You are disabling the claude-news daily scheduler.
 1. **Uninstall scheduler**:
 
 ```bash
-PYTHONPATH="${CLAUDE_PLUGIN_ROOT}" python3 -c "
+VENV_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/claude-news/.venv"
+if [ -f "$VENV_DIR/bin/python" ]; then
+    PYTHONPATH="${CLAUDE_PLUGIN_ROOT}" "$VENV_DIR/bin/python" -c "
 from pipeline.scheduler import uninstall_scheduler, get_scheduler_status
 status = get_scheduler_status()
 if not status['installed']:
@@ -20,6 +22,9 @@ else:
     ok = uninstall_scheduler()
     print('Scheduler removed.' if ok else 'Failed to remove scheduler.')
 "
+else
+    echo "ERROR: venv not found at $VENV_DIR. Run /news init first."
+fi
 ```
 
 2. **Confirm to user**: "Scheduler removed. Data preserved at ~/.local/share/claude-news/"

@@ -58,7 +58,7 @@ LASTRUN
 
 # Phase 1: Collect
 RAW_FILE="$DATA_DIR/data/raw/$DATE.jsonl"
-PYTHONPATH="$PLUGIN_DIR" python "$SCRIPT_DIR/collect.py" \
+PYTHONPATH="$PLUGIN_DIR" python3 "$SCRIPT_DIR/collect.py" \
     --config "$CONFIG_DIR/config.yaml" \
     --output "$RAW_FILE" \
     2> >(filter_log >> "$LOG") || {
@@ -68,9 +68,9 @@ PYTHONPATH="$PLUGIN_DIR" python "$SCRIPT_DIR/collect.py" \
 # Phase 2: Analyze (only if raw file exists and non-empty)
 if [ -s "$RAW_FILE" ]; then
     # JSONL integrity check
-    if ! python -c "import json, sys; [json.loads(l) for l in open(sys.argv[1]) if l.strip()]" "$RAW_FILE" 2>/dev/null; then
+    if ! python3 -c "import json, sys; [json.loads(l) for l in open(sys.argv[1]) if l.strip()]" "$RAW_FILE" 2>/dev/null; then
         echo "$(date -Iseconds) WARN: corrupt JSONL, attempting partial recovery" >> "$LOG"
-        python -c "
+        python3 -c "
 import json, sys
 with open(sys.argv[1]) as f:
     lines = f.readlines()
@@ -88,7 +88,7 @@ print(f'Recovered {len(good)}/{len(valid)} lines')
 " "$RAW_FILE" >> "$LOG" 2>&1
     fi
 
-    PYTHONPATH="$PLUGIN_DIR" python "$SCRIPT_DIR/analyze.py" \
+    PYTHONPATH="$PLUGIN_DIR" python3 "$SCRIPT_DIR/analyze.py" \
         --config "$CONFIG_DIR/config.yaml" \
         --input "$RAW_FILE" \
         --output "$DATA_DIR/data/digests/$DATE.md" \
@@ -102,8 +102,15 @@ fi
 
 # Update last_run.json
 COLLECTED=$(wc -l < "$RAW_FILE" 2>/dev/null | tr -d ' ' || echo 0)
+DIGEST_FILE="$DATA_DIR/data/digests/$DATE.md"
+if [ -f "$DIGEST_FILE" ]; then
+    # Extract "Kept: N" from digest stats line
+    KEPT=$(grep -oP 'Kept: \K[0-9]+' "$DIGEST_FILE" 2>/dev/null || echo 0)
+else
+    KEPT=0
+fi
 cat > "$DATA_DIR/data/state/last_run.json" <<LASTRUN
-{"timestamp": "$(date -Iseconds)", "status": "success", "items_collected": $COLLECTED, "items_kept": 0}
+{"timestamp": "$(date -Iseconds)", "status": "success", "items_collected": $COLLECTED, "items_kept": $KEPT}
 LASTRUN
 
 # Cleanup: prune old data per retention policy

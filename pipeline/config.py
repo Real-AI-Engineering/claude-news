@@ -49,7 +49,9 @@ def resolve_config(
     else:
         if preset_dir is None:
             preset_dir = Path(__file__).resolve().parent.parent / "presets"
-        preset_path = preset_dir / f"{preset_name}.yaml"
+        preset_path = (preset_dir / f"{preset_name}.yaml").resolve()
+        if not preset_path.is_relative_to(preset_dir.resolve()):
+            raise ValueError(f"Invalid preset name: {preset_name}")
         if not preset_path.exists():
             raise FileNotFoundError(f"Preset not found: {preset_path}")
         base = load_preset(preset_path)

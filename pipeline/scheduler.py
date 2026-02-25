@@ -5,6 +5,7 @@ Linux:  systemd user unit (timer + service), with cron fallback
 """
 from __future__ import annotations
 
+import os
 import platform
 import shutil
 import subprocess
@@ -46,8 +47,30 @@ def _launchd_plist_path() -> Path:
     return Path.home() / "Library" / "LaunchAgents" / f"{_LAUNCHD_LABEL}.plist"
 
 
+def _xdg_env_dict() -> dict[str, str]:
+    """Return XDG env vars if set by user (to propagate to scheduler)."""
+    env = {}
+    for var in ("XDG_CONFIG_HOME", "XDG_DATA_HOME"):
+        val = os.environ.get(var)
+        if val:
+            env[var] = val
+    return env
+
+
 def _launchd_plist_content(run_sh_path: str, time: str) -> str:
     hour, minute = _validate_time(time)
+    xdg_env = _xdg_env_dict()
+    env_section = ""
+    if xdg_env:
+        pairs = "\n".join(
+            f"        <key>{k}</key>\n        <string>{v}</string>"
+            for k, v in xdg_env.items()
+        )
+        env_section = f"""
+    <key>EnvironmentVariables</key>
+    <dict>
+{pairs}
+    </dict>"""
     return f"""<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -71,7 +94,7 @@ def _launchd_plist_content(run_sh_path: str, time: str) -> str:
     <key>StandardErrorPath</key>
     <string>/tmp/claude-news-stderr.log</string>
     <key>RunAtLoad</key>
-    <false/>
+    <false/>{env_section}
 </dict>
 </plist>"""
 
@@ -101,12 +124,15 @@ def _systemd_dir() -> Path:
 
 
 def _systemd_service_content(run_sh_path: str) -> str:
+    xdg_env = _xdg_env_dict()
+    env_lines = "\n".join(f"Environment={k}={v}" for k, v in xdg_env.items())
+    env_section = f"\n{env_lines}" if env_lines else ""
     return f"""[Unit]
 Description=claude-news daily pipeline
 
 [Service]
 Type=oneshot
-ExecStart={run_sh_path}
+ExecStart={run_sh_path}{env_section}
 """
 
 
