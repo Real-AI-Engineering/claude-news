@@ -190,16 +190,25 @@ def _hours_old(item: dict) -> float:
 def main() -> None:
     """CLI entrypoint for the analysis pipeline."""
     parser = argparse.ArgumentParser(description="Analyze and score collected news items.")
-    parser.add_argument("--config", default="collector/sources.yaml", help="Path to sources.yaml")
-    parser.add_argument("--input", default="data/raw.jsonl", help="Input raw JSONL path")
-    parser.add_argument("--output", default="data/digest.md", help="Output digest path")
-    parser.add_argument("--state-dir", default="data/state", help="State directory for seen_urls.txt")
+    parser.add_argument("--config", default=None, help="Path to config.yaml")
+    parser.add_argument("--input", default=None, help="Input raw JSONL path")
+    parser.add_argument("--output", default=None, help="Output digest path")
+    parser.add_argument("--state-dir", default=None, help="State directory for seen_urls.txt")
     args = parser.parse_args()
 
-    # Load config
-    import yaml  # type: ignore
-    with open(args.config, "r", encoding="utf-8") as f:
-        config = yaml.safe_load(f)
+    # Resolve config: if --config points to a config.yaml with preset field, use overlay
+    if args.config:
+        import yaml  # type: ignore
+        with open(args.config, "r", encoding="utf-8") as f:
+            raw = yaml.safe_load(f)
+        if "preset" in raw or "add_feeds" in raw:
+            from pipeline.config import resolve_config
+            config = resolve_config()
+        else:
+            config = raw
+    else:
+        from pipeline.config import resolve_config
+        config = resolve_config()
 
     keywords: dict[str, list[str]] = config.get("keywords", {})
     scoring_cfg: dict = config.get("scoring", {})
@@ -209,8 +218,21 @@ def main() -> None:
     }
     max_items: int = scoring_cfg.get("max_items", 10)
 
+    # Resolve paths with XDG defaults
+    if args.input:
+        input_path = Path(args.input)
+    else:
+        from pipeline.paths import raw_dir
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        input_path = raw_dir() / f"{today}.jsonl"
+
+    if args.state_dir:
+        state_dir_path = Path(args.state_dir)
+    else:
+        from pipeline.paths import state_dir as _state_dir
+        state_dir_path = _state_dir()
+
     # Load raw items
-    input_path = Path(args.input)
     raw_items: list[dict] = []
     if input_path.exists():
         with input_path.open("r", encoding="utf-8") as f:
@@ -227,8 +249,7 @@ def main() -> None:
     from pipeline.dedup import SeenUrls, dedup_items
     from pipeline.collect import RawItem
 
-    state_dir = Path(args.state_dir)
-    seen_path = state_dir / "seen_urls.txt"
+    seen_path = state_dir_path / "seen_urls.txt"
     seen = SeenUrls(seen_path, max_age_days=config.get("retention", {}).get("seen_urls_days", 90))
 
     # Convert raw dicts to RawItem for dedup
@@ -289,7 +310,11 @@ def main() -> None:
     digest = generate_digest(final, today, stats)
 
     # Atomic write
-    output_path = Path(args.output)
+    if args.output:
+        output_path = Path(args.output)
+    else:
+        from pipeline.paths import digests_dir
+        output_path = digests_dir() / f"{today}.md"
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_path = tempfile.mkstemp(dir=output_path.parent, suffix=".tmp")
     try:

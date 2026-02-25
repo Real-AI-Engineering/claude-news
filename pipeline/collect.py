@@ -267,26 +267,35 @@ def write_raw_jsonl(items: list[RawItem], output_path: Path) -> None:
 def main() -> None:
     """CLI entrypoint."""
     parser = argparse.ArgumentParser(description="Collect news items from configured sources.")
-    parser.add_argument(
-        "--config",
-        default="collector/sources.yaml",
-        help="Path to sources.yaml (default: collector/sources.yaml)",
-    )
-    parser.add_argument(
-        "--output",
-        default="data/raw.jsonl",
-        help="Output JSONL path (default: data/raw.jsonl)",
-    )
+    parser.add_argument("--config", default=None, help="Path to config.yaml")
+    parser.add_argument("--output", default=None, help="Output JSONL path")
     args = parser.parse_args()
 
-    config = load_config(args.config)
+    # Resolve config: if --config points to a config.yaml with preset field, use overlay
+    if args.config:
+        raw = load_config(args.config)
+        if "preset" in raw or "add_feeds" in raw:
+            from pipeline.config import resolve_config
+            config = resolve_config()
+        else:
+            config = raw
+    else:
+        from pipeline.config import resolve_config
+        config = resolve_config()
+
     items = collect_all(config)
 
     # Normalize all URLs
     for item in items:
         item.url = normalize_url(item.url)
 
-    output_path = Path(args.output)
+    if args.output:
+        output_path = Path(args.output)
+    else:
+        from pipeline.paths import raw_dir
+        date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        output_path = raw_dir() / f"{date}.jsonl"
+
     write_raw_jsonl(items, output_path)
     print(f"[collect] Written {len(items)} items to {output_path}")
 
