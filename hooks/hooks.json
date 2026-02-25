@@ -1,10 +1,16 @@
 {
-  "hooks": [
-    {
-      "event": "SessionStart",
-      "type": "command",
-      "command": "bash -c 'DIGEST=\"${XDG_DATA_HOME:-$HOME/.local/share}/herald/data/digests/$(date +%Y-%m-%d).md\"; if [ -f \"$DIGEST\" ]; then echo \"Fresh news digest available for today. Run /news digest to read.\"; fi'",
-      "timeout_ms": 2000
-    }
-  ]
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'DIGEST=\"${XDG_DATA_HOME:-$HOME/.local/share}/herald/data/digests/$(date +%Y-%m-%d).md\"; if [ -f \"$DIGEST\" ]; then echo \"Fresh news digest available for today. Run /news digest to read.\"; fi'",
+            "timeout": 2
+          }
+        ]
+      }
+    ]
+  }
 }

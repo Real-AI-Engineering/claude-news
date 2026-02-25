@@ -2,5 +2,7 @@
   "name": "herald",
   "description": "Daily curated news digest for your domain. One command to set up, zero API keys, works offline after first fetch.",
   "version": "0.1.0",
-  "author": "Real AI Engineering"
+  "author": {
+    "name": "Real AI Engineering"
+  }
 }
