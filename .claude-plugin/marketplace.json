@@ -6,6 +6,7 @@
       "description": "Daily curated news digest for your domain. Zero API keys, fully local.",
       "skills": ["./skills"],
       "commands": ["./commands"],
+      "hooks": ["./hooks"],
       "strict": false
     }
   ]
