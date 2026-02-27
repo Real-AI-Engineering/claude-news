@@ -6,10 +6,12 @@ A [Claude Code](https://docs.anthropic.com/en/docs/claude-code) plugin that deli
 
 ## Install
 
+<!-- INSTALL:START — auto-synced from emporium/INSTALL_REFERENCE.md -->
 ```bash
 claude plugin marketplace add heurema/emporium
 claude plugin install herald@emporium
 ```
+<!-- INSTALL:END -->
 
 Then in Claude Code:
 
