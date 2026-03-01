@@ -8,6 +8,17 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+from pipeline.analyze import (
+    _hours_old,
+    apply_hard_cap,
+    generate_digest,
+    keyword_density,
+    keyword_match,
+    signal_score,
+)
+from pipeline.collect import collect_all, normalize_url
+from pipeline.dedup import SeenUrls, dedup_items
+
 
 def run_demo(config: dict | None = None) -> str:
     """Run the full pipeline in demo mode and return the digest string.
@@ -16,17 +27,6 @@ def run_demo(config: dict | None = None) -> str:
     an empty config (HN Algolia only, no keyword filter).
     Results are not saved to disk.
     """
-    from pipeline.analyze import (
-        _hours_old,
-        apply_hard_cap,
-        generate_digest,
-        keyword_density,
-        keyword_match,
-        signal_score,
-    )
-    from pipeline.collect import collect_all, normalize_url
-    from pipeline.dedup import SeenUrls, dedup_items
-
     # Step 1: resolve config
     if config is None:
         try:
@@ -36,7 +36,6 @@ def run_demo(config: dict | None = None) -> str:
             config = {"feeds": [], "keywords": {}, "scoring": {}}
 
     keywords: dict[str, list[str]] = config.get("keywords", {})
-    scoring_cfg: dict = config.get("scoring", {})
     source_weights: dict[str, float] = {
         feed["name"]: feed.get("weight", 0.1)
         for feed in config.get("feeds", [])
@@ -115,8 +114,6 @@ def run_demo(config: dict | None = None) -> str:
 
     # Step 11: prepend no-keywords note after stats line (if keywords were empty)
     if not keywords:
-        # Insert note after the stats line (second non-empty line after title)
-        # Stats line looks like: _Collected: N | ..._
         lines = digest.splitlines(keepends=True)
         insert_idx = None
         for i, line in enumerate(lines):
