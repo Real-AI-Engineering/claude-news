@@ -8,8 +8,5 @@
   "homepage": "https://github.com/heurema/herald",
   "repository": "https://github.com/heurema/herald",
   "license": "MIT",
-  "keywords": ["news-digest", "rss", "daily-digest", "curation", "ai-news"],
-  "status": "active",
-  "owner": "heurema",
-  "tags": ["devtools", "news", "digest"]
+  "keywords": ["news-digest", "rss", "daily-digest", "curation", "ai-news"]
 }
