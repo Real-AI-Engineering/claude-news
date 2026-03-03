@@ -43,12 +43,17 @@ if [ "$PY_MAJOR" -lt 3 ] || { [ "$PY_MAJOR" -eq 3 ] && [ "$PY_MINOR" -lt 10 ]; }
 fi
 echo "  Python $PY_VERSION OK"
 
-# pip
-if ! python3 -m pip --version &>/dev/null; then
-    echo "ERROR: pip not found. Install pip."
+# Package installer: prefer uv, fall back to pip
+USE_UV=false
+if command -v uv &>/dev/null; then
+    USE_UV=true
+    echo "  uv $(uv --version 2>/dev/null | head -1) OK"
+elif python3 -m pip --version &>/dev/null; then
+    echo "  pip OK"
+else
+    echo "ERROR: Neither uv nor pip found. Install uv (recommended) or pip."
     exit 1
 fi
-echo "  pip OK"
 
 # Internet connectivity
 if ! python3 -c "import urllib.request; urllib.request.urlopen('https://pypi.org', timeout=5)" 2>/dev/null; then
@@ -69,7 +74,11 @@ VENV_DIR="$DATA_DIR/.venv"
 
 echo "[2/6] Creating virtual environment at $VENV_DIR..."
 if [ ! -f "$VENV_DIR/bin/activate" ]; then
-    python3 -m venv "$VENV_DIR"
+    if [ "$USE_UV" = true ]; then
+        uv venv "$VENV_DIR"
+    else
+        python3 -m venv "$VENV_DIR"
+    fi
     echo "  Created"
 else
     echo "  Already exists"
@@ -78,7 +87,11 @@ fi
 # --- Install dependencies ---
 
 echo "[3/6] Installing dependencies..."
-"$VENV_DIR/bin/pip" install -q -r "$SCRIPT_DIR/pipeline/requirements.txt"
+if [ "$USE_UV" = true ]; then
+    uv pip install -q -r "$SCRIPT_DIR/pipeline/requirements.txt" --python "$VENV_DIR/bin/python"
+else
+    "$VENV_DIR/bin/pip" install -q -r "$SCRIPT_DIR/pipeline/requirements.txt"
+fi
 echo "  Installed"
 
 # --- Copy config ---
