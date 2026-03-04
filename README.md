@@ -2,10 +2,10 @@
 
 <div align="center">
 
-**Curate your daily news digest with zero API keys**
+**Local-first news intelligence for AI agents**
 
 ![Claude Code Plugin](https://img.shields.io/badge/Claude%20Code-Plugin-5b21b6?style=flat-square)
-![Version](https://img.shields.io/badge/version-1.0.0-5b21b6?style=flat-square)
+![Version](https://img.shields.io/badge/version-2.0.0-5b21b6?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-5b21b6?style=flat-square)
 
 ```bash
@@ -17,7 +17,15 @@ claude plugin install herald@emporium
 
 ## What it does
 
-Most developer news tools require API keys, cloud accounts, or paid tiers to be useful. Herald fetches RSS feeds and the public HN Algolia API, runs a local scoring pipeline, and writes a ranked top-10 Markdown digest to your machine — no credentials, no network calls to third-party LLMs, no data leaving your box. You configure topics and sources via slash commands; the daily scheduler handles the rest.
+Herald collects articles from RSS feeds and Hacker News, deduplicates by URL, clusters related articles into stories using title similarity, scores them by source weight and recency, and generates a ranked Markdown digest — all locally, no API keys, no cloud.
+
+The pipeline: **collect → ingest → cluster → project**.
+
+```
+RSS/Atom feeds ─┐
+                 ├─→ articles ─→ stories (clustered) ─→ scored brief
+HN Algolia API ─┘
+```
 
 ## Install
 
@@ -34,153 +42,109 @@ claude plugin install herald@emporium
 ```bash
 git clone https://github.com/heurema/herald
 cd herald
-pip install -e .
-# Copy the plugin manifest into Claude Code's plugin directory
-cp -r plugin/ ~/.claude/plugins/herald/
+pip install httpx fastfeedparser pyyaml
 ```
 
-Then restart Claude Code and run `/news-init`.
+Then symlink or copy the plugin directory into Claude Code's plugin path and run `/news-init`.
 
 </details>
 
 ## Quick start
 
 ```
-/news-init
-/news-digest
+/news-init          # creates ~/.herald/ with config and database
+/news-add <url>     # add an RSS feed
+/news-run           # collect, ingest, cluster, generate brief
+/news-digest        # read the latest brief
 ```
-
-`/news-init` runs preflight checks, creates a Python venv, installs dependencies, copies the default config, and sets up a daily scheduler. `/news-digest` reads today's digest once the first run completes.
 
 ## Commands
 
 | Command | What it does |
 |---------|-------------|
-| `/news-init` | Interactive setup wizard — pick preset, schedule time, verify |
-| `/news-init <topic>` | Add a topic pack (e.g., `rust`, `devops`) to existing setup |
-| `/news-add <url>` | Add any URL — auto-discovers RSS feed, suggests name and priority |
-| `/news-add <topic>` | Add a built-in topic pack with feeds + keywords |
-| `/news-sources` | View all active sources grouped by tier |
-| `/news-sources remove <name>` | Remove a source (preset or custom) |
-| `/news-sources restore <name>` | Restore a removed preset source |
-| `/news-sources export` | Export full config as standalone YAML |
-| `/news-sources import <path>` | Import sources from a shared config file |
-| `/news-digest` | Read today's digest, grouped by topic |
-| `/news-run` | Manually trigger collection + analysis |
-| `/news-stop` | Disable scheduler, show cleanup options |
+| `/news-init` | Create data directory, config template, and database |
+| `/news-add <url>` | Add an RSS/Atom feed — auto-discovers feed URL |
+| `/news-sources` | View all sources grouped by category |
+| `/news-sources remove <name>` | Remove a source from config |
+| `/news-run` | Run the full pipeline manually |
+| `/news-digest` | Read the latest brief with 5-section analysis |
+| `/news-status` | Show article/story counts and last run time |
+| `/news-stop` | Show cleanup options |
 
-## Features
+## Architecture
 
-Herald runs a five-stage local pipeline on every collection cycle:
+Herald v2 uses a 4-stage pipeline with SQLite storage:
 
-```
-Daily: scheduler → run.sh → collect.py → analyze.py → digest.md
-                                ↓
-                  20 RSS feeds + HN Algolia API
-                                ↓
-                  dedup → keyword filter → signal scoring → top 10
-```
+1. **Collect** — fetches RSS/Atom feeds and HN front-page stories via public APIs. Optional Tavily adapter for web search.
+2. **Ingest** — UPSERT articles with URL canonicalization, deduplication, topic assignment, and cross-source mention tracking.
+3. **Cluster** — groups related articles into stories using `SequenceMatcher` title similarity with 4 merge guards (threshold, time gap, title length, word overlap). Canonical article re-election with hysteresis.
+4. **Project** — generates a Markdown brief with YAML frontmatter, stories grouped by type (release, research, tutorial, opinion, news), scored and ranked.
 
-1. **Collect** — fetches RSS feeds and HN front-page stories via public APIs
-2. **Dedup** — 3-layer deduplication (URL hash, normalization, title similarity)
-3. **Filter** — keyword matching against your configured topics
-4. **Score** — signal scoring based on source weight, points, keyword density, recency
-5. **Digest** — top 10 items as a Markdown file, grouped by topic
-
-### Adding sources
-
-The fastest way to add sources — no YAML editing required:
+### Data model
 
 ```
-/news-add https://simonwillison.net       # auto-discovers RSS feed
-/news-add rust                            # adds Rust topic pack (3 feeds + keywords)
-/news-init devops                         # adds DevOps topic pack to existing setup
+sources → articles → mentions (cross-source)
+                  → article_topics
+                  → story_articles → stories → story_topics
 ```
 
-Built-in topic packs: `rust`, `devops`, `golang`, `typescript`, `security`, `python`, `data`.
+### Scoring
 
-To manage existing sources:
-
-```
-/news-sources                             # see all active sources
-/news-sources remove "r/MachineLearning"  # remove a source
-/news-sources restore "r/MachineLearning" # restore a removed preset source
-```
+- **Article score**: `source_weight × (1 + log₂(points + 1)) × density × recency × type_boost`
+- **Story score**: `max(article_scores) × (1 + 0.1 × (source_count - 1)) × momentum`
 
 ## Configuration
 
-Config lives at `~/.config/herald/config.yaml`. It layers your overrides on top of a preset:
+Config: `~/.herald/config.yaml`
 
 ```yaml
-version: 1
-preset: "ai-engineering"    # base preset
-schedule_time: "06:00"
-timezone: "local"
-max_items: 10
-
-# Add your own feeds
-add_feeds:
-  - name: "My Blog"
-    url: "https://myblog.com/feed"
-    tier: 1
+sources:
+  - id: hn
+    name: Hacker News
+    type: hn           # hn | rss | tavily
+    weight: 0.3
+    category: community
+  - id: simonw
+    name: Simon Willison
+    type: rss
+    url: https://simonwillison.net/atom/everything/
     weight: 0.25
+    category: community
 
-# Remove preset feeds you don't want
-remove_feeds:
-  - "r/MachineLearning"
+topics:
+  ai_agents:
+    keywords: [agent, agents, agentic, tool use, mcp]
+  ai_models:
+    keywords: [claude, gpt, gemini, llama, llm]
 
-# Add keyword topics
-add_keywords:
-  devops:
-    - "kubernetes"
-    - "terraform"
+clustering:
+  threshold: 0.65        # title similarity threshold
+  max_time_gap_days: 7   # max days between clustered articles
 
-# Remove keyword topics
-remove_keywords:
-  - ai_finance
+schedule:
+  interval_hours: 4
 ```
-
-The default preset is `ai-engineering` — 20 curated feeds across 5 tiers (HN, newsletters, release feeds, finance, community) and 5 keyword categories. To start from scratch:
-
-```
-/news-init --preset blank --time 08:00
-```
-
-Then add your own feeds and keywords directly in the config file or via `/news-add`.
 
 ### Data paths
 
 ```
-~/.config/herald/          # config
-~/.local/share/herald/     # data + venv
-├── .venv/
-└── data/
-    ├── raw/YYYY-MM-DD.jsonl    # raw items (90-day retention)
-    ├── digests/YYYY-MM-DD.md   # daily digests (365-day retention)
-    └── state/
-        ├── seen_urls.txt       # dedup index (90-day retention)
-        ├── last_run.json       # run metadata
-        └── collect.log         # run log
+~/.herald/
+├── config.yaml
+├── herald.db           # SQLite database
+└── briefs/
+    └── {run_id}.md     # generated briefs
 ```
 
 ## Requirements
 
-- Python 3.10+
-- macOS or Linux (Windows via WSL)
+- Python 3.12+
+- `httpx`, `fastfeedparser`, `pyyaml`
+- macOS or Linux
 - Claude Code
 
 ## Privacy
 
-Herald makes no calls to paid or authenticated APIs. It fetches only public RSS feeds and the HN Algolia API. All collected data and digests stay on your machine under `~/.local/share/herald/`. No telemetry, no cloud sync.
-
-Optional: a free-tier Tavily search key unlocks richer article previews, but it is not required for core functionality.
-
-## See also
-
-- [skill7.dev](https://skill7.dev) — plugin registry and documentation
-- [emporium](https://github.com/heurema/emporium) — heurema plugin marketplace
-- [signum](https://github.com/heurema/signum) — risk-adaptive development pipeline with adversarial code review
-- [proofpack](https://github.com/heurema/proofpack) — proof-carrying CI gate for AI agent changes
+Herald fetches only public RSS feeds and the HN Algolia API. All data stays on your machine under `~/.herald/`. No telemetry, no cloud sync. Optional Tavily adapter requires a free API key but is not needed for core functionality.
 
 ## License
 
