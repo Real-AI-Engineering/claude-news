@@ -12,7 +12,7 @@ from difflib import SequenceMatcher
 
 from herald.config import ClusterConfig
 from herald.db import Database
-from herald.scoring import story_score
+from herald.scoring import _extract_paper_id, effective_source_count, story_score
 from herald.ulid import generate_ulid
 
 
@@ -115,7 +115,7 @@ def _recompute_story_score(db: Database, story_id: str, cfg: ClusterConfig) -> f
 
     rows = db.execute(
         """
-        SELECT a.score_base, a.collected_at, a.origin_source_id
+        SELECT a.score_base, a.collected_at, a.origin_source_id, a.url_canonical
         FROM story_articles sa
         JOIN articles a ON a.id = sa.article_id
         WHERE sa.story_id = ?
@@ -127,7 +127,7 @@ def _recompute_story_score(db: Database, story_id: str, cfg: ClusterConfig) -> f
         return 0.0
 
     max_score = max(row[0] for row in rows)
-    source_count = len({row[2] for row in rows})
+    source_count = effective_source_count([(row[2], row[3]) for row in rows])
     has_recent = any(row[1] >= cutoff for row in rows)
     return story_score(max_score, source_count, has_recent)
 
@@ -141,7 +141,7 @@ def _can_merge(
     cfg: ClusterConfig,
     db: Database,
 ) -> bool:
-    """Apply 4 merge guards. Return True if the article can merge into story."""
+    """Apply 5 merge guards. Return True if the article can merge into story."""
     # Guard 1: title similarity
     story_norm = normalize_title(story["title"])
     if _title_similarity(article_norm, story_norm) < cfg.threshold:
@@ -164,6 +164,27 @@ def _can_merge(
 
     if article_topics and story_topics and not (article_topics & story_topics):
         return False
+
+    # Guard 5: paper ID conflict — different arxiv papers must not merge
+    article_url_row = db.execute(
+        "SELECT url_canonical FROM articles WHERE id = ?", (article_id,)
+    ).fetchone()
+    if article_url_row:
+        article_paper_id = _extract_paper_id(article_url_row[0])
+        if article_paper_id is not None:
+            member_urls = db.execute(
+                """
+                SELECT a.url_canonical
+                FROM story_articles sa
+                JOIN articles a ON a.id = sa.article_id
+                WHERE sa.story_id = ?
+                """,
+                (story["id"],),
+            ).fetchall()
+            for row in member_urls:
+                member_paper_id = _extract_paper_id(row[0])
+                if member_paper_id is not None and member_paper_id != article_paper_id:
+                    return False
 
     return True
 

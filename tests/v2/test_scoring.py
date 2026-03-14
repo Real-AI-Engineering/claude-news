@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 
-from herald.scoring import article_score_base, story_score
+from herald.scoring import article_score_base, effective_source_count, story_score
 
 
 def test_article_baseline():
@@ -42,3 +42,47 @@ def test_story_multi_source():
 def test_story_momentum():
     expected = 1.0 + 0.0 + 0.2
     assert story_score(1.0, 1, has_recent=True) == expected
+
+
+# -- effective_source_count --------------------------------------------------
+
+def test_effective_source_count_no_mirrors():
+    data = [("hn", "https://example.com/foo"), ("reddit", "https://reddit.com/bar")]
+    assert effective_source_count(data) == 2
+
+
+def test_effective_source_count_arxiv_mirror_collapsed():
+    """arxiv.org + tldr.takara.ai with same paper ID count as 1 source."""
+    data = [
+        ("arxiv", "https://arxiv.org/abs/2603.12345"),
+        ("hf_papers", "https://tldr.takara.ai/p/2603.12345"),
+    ]
+    assert effective_source_count(data) == 1
+
+
+def test_effective_source_count_different_papers_not_collapsed():
+    """Different arxiv papers from the same mirror domain count separately."""
+    data = [
+        ("arxiv", "https://arxiv.org/abs/2603.11111"),
+        ("hf_papers", "https://tldr.takara.ai/p/2603.22222"),
+    ]
+    assert effective_source_count(data) == 2
+
+
+def test_effective_source_count_mixed_mirror_and_regular():
+    """Mirror pair + independent source = 2 effective sources."""
+    data = [
+        ("arxiv", "https://arxiv.org/abs/2603.12345"),
+        ("hf_papers", "https://tldr.takara.ai/p/2603.12345"),
+        ("hn", "https://news.ycombinator.com/item?id=99999"),
+    ]
+    assert effective_source_count(data) == 2
+
+
+def test_effective_source_count_empty():
+    assert effective_source_count([]) == 1
+
+
+def test_effective_source_count_single():
+    data = [("arxiv", "https://arxiv.org/abs/2603.12345")]
+    assert effective_source_count(data) == 1

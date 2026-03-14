@@ -30,9 +30,12 @@ def _insert_article(
     score_base: float = 1.0,
     collected_at: int | None = None,
     source_id: str = "hn",
+    url: str | None = None,
 ) -> None:
     if collected_at is None:
         collected_at = int(time.time())
+    if url is None:
+        url = f"http://example.com/{article_id}"
     db.execute(
         """
         INSERT INTO articles
@@ -42,8 +45,8 @@ def _insert_article(
         """,
         (
             article_id,
-            f"http://example.com/{article_id}",
-            f"http://example.com/{article_id}",
+            url,
+            url,
             title,
             source_id,
             collected_at,
@@ -572,4 +575,78 @@ def test_dissimilar_titles_separate_stories(tmp_path):
     result = cluster(db)
     assert result.stories_created == 2
     assert result.stories_updated == 0
+    db.close()
+
+
+# ---------------------------------------------------------------------------
+# Guard 5: paper ID conflict
+# ---------------------------------------------------------------------------
+
+def test_paper_id_conflict_blocks_merge(tmp_path):
+    """Different arxiv papers with similar titles must not merge."""
+    db = _make_db(tmp_path)
+    db.execute("INSERT INTO sources (id, name, weight) VALUES ('arxiv', 'arXiv', 0.3)")
+    db.execute("INSERT INTO sources (id, name, weight) VALUES ('hf', 'HF Papers', 0.25)")
+    now = int(time.time())
+    _insert_article(
+        db, "a1",
+        "Something Something with Large Language Models",
+        source_id="arxiv", collected_at=now - 100,
+        url="https://arxiv.org/abs/2603.11111",
+    )
+    _insert_article(
+        db, "a2",
+        "Something Else with Large Language Models",
+        source_id="hf", collected_at=now,
+        url="https://tldr.takara.ai/p/2603.22222",
+    )
+    result = cluster(db)
+    assert result.stories_created == 2, "Different papers must create separate stories"
+    db.close()
+
+
+def test_paper_id_same_allows_merge(tmp_path):
+    """Same arxiv paper from arxiv + mirror should merge."""
+    db = _make_db(tmp_path)
+    db.execute("INSERT INTO sources (id, name, weight) VALUES ('arxiv', 'arXiv', 0.3)")
+    db.execute("INSERT INTO sources (id, name, weight) VALUES ('hf', 'HF Papers', 0.25)")
+    now = int(time.time())
+    _insert_article(
+        db, "a1",
+        "Exact Same Paper Title with Large Language Models",
+        source_id="arxiv", collected_at=now - 100,
+        url="https://arxiv.org/abs/2603.12345",
+    )
+    _insert_article(
+        db, "a2",
+        "Exact Same Paper Title with Large Language Models",
+        source_id="hf", collected_at=now,
+        url="https://tldr.takara.ai/p/2603.12345",
+    )
+    result = cluster(db)
+    assert result.stories_created == 1, "Same paper should merge"
+    assert result.stories_updated == 1
+    db.close()
+
+
+def test_paper_id_no_conflict_with_non_arxiv(tmp_path):
+    """Arxiv paper + non-arxiv article (HN link) should still merge on title."""
+    db = _make_db(tmp_path)
+    db.execute("INSERT INTO sources (id, name, weight) VALUES ('arxiv', 'arXiv', 0.3)")
+    now = int(time.time())
+    _insert_article(
+        db, "a1",
+        "Amazing Discovery with Large Language Models Today",
+        source_id="hn", collected_at=now - 100,
+        url="https://news.ycombinator.com/item?id=99999",
+    )
+    _insert_article(
+        db, "a2",
+        "Amazing Discovery with Large Language Models Today",
+        source_id="arxiv", collected_at=now,
+        url="https://arxiv.org/abs/2603.55555",
+    )
+    result = cluster(db)
+    assert result.stories_created == 1, "Arxiv + non-arxiv should merge on title"
+    assert result.stories_updated == 1
     db.close()

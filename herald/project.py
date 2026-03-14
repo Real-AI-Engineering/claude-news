@@ -9,6 +9,7 @@ import time
 from datetime import datetime, timezone
 
 from herald.db import Database
+from herald.scoring import effective_source_count
 
 
 # Ordered list of story types for section rendering
@@ -103,7 +104,7 @@ def _fetch_story_articles(db: Database, story_id: str) -> list[dict]:
     """
     rows = db.execute(
         """
-        SELECT a.url_canonical, a.title, s.name
+        SELECT a.url_canonical, a.title, s.name, s.id
         FROM story_articles sa
         JOIN articles a ON a.id = sa.article_id
         JOIN sources s ON s.id = a.origin_source_id
@@ -112,7 +113,10 @@ def _fetch_story_articles(db: Database, story_id: str) -> list[dict]:
         """,
         (story_id,),
     ).fetchall()
-    return [{"url": row[0], "title": row[1], "source_name": row[2]} for row in rows]
+    return [
+        {"url": row[0], "title": row[1], "source_name": row[2], "source_id": row[3]}
+        for row in rows
+    ]
 
 
 def _fetch_story_topics(db: Database, story_id: str) -> list[str]:
@@ -158,7 +162,9 @@ def _render_story(story: dict, articles: list[dict], topics: list[str]) -> str:
 
     # Title line with score badge
     score = story["score"]
-    source_count = len({a["source_name"] for a in articles})
+    source_count = effective_source_count(
+        [(a["source_id"], a["url"]) for a in articles]
+    ) if articles else 0
     source_label = "source" if source_count == 1 else "sources"
     lines.append(f"### {story['title']}")
     lines.append(f"")
