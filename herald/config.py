@@ -51,10 +51,36 @@ def _parse_source(raw: dict) -> Source:
 
 
 def load_config(path: Path) -> HeraldConfig:
-    """Load config from a YAML file."""
+    """Load config from a YAML file, merging any includes."""
     with path.open("r", encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
-    return _parse_config(data)
+
+    config = _parse_config(data)
+
+    # Merge sources from included files
+    for include_path in data.get("includes", []):
+        resolved = Path(include_path).expanduser()
+        if not resolved.is_absolute():
+            resolved = path.parent / resolved
+        if not resolved.is_file():
+            import sys
+            print(f"herald: includes: skipping {resolved} (not found)", file=sys.stderr)
+            continue
+        try:
+            with resolved.open("r", encoding="utf-8") as f:
+                inc_data = yaml.safe_load(f) or {}
+            inc_sources = [_parse_source(s) for s in inc_data.get("sources", [])]
+            # Dedupe by id — main config wins over includes
+            existing_ids = {s.id for s in config.sources}
+            for src in inc_sources:
+                if src.id not in existing_ids:
+                    config.sources.append(src)
+                    existing_ids.add(src.id)
+        except Exception as exc:
+            import sys
+            print(f"herald: includes: error loading {resolved}: {exc}", file=sys.stderr)
+
+    return config
 
 
 def load_config_from_string(text: str) -> HeraldConfig:
