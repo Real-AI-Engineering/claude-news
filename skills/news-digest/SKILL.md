@@ -1,6 +1,7 @@
 ---
+
 name: news-digest
-description: Daily curated news digest. Use when user asks about news, trends, what's new, or at session start if a fresh digest is available.
+description: Daily curated news digest for your domain. One command to set up, zero API keys, works offline after first fetch.
 ---
 
 # News Digest

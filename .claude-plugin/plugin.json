@@ -1,12 +1,18 @@
 {
-  "name": "herald",
-  "description": "Daily curated news digest for your domain. One command to set up, zero API keys, works offline after first fetch.",
-  "version": "2.1.0",
   "author": {
     "name": "heurema"
   },
+  "description": "Daily curated news digest for your domain. One command to set up, zero API keys, works offline after first fetch.",
   "homepage": "https://github.com/heurema/herald",
-  "repository": "https://github.com/heurema/herald",
+  "keywords": [
+    "news-digest",
+    "rss",
+    "daily-digest",
+    "curation",
+    "ai-news"
+  ],
   "license": "MIT",
-  "keywords": ["news-digest", "rss", "daily-digest", "curation", "ai-news"]
+  "name": "herald",
+  "repository": "https://github.com/heurema/herald",
+  "version": "2.1.1"
 }
