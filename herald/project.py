@@ -141,6 +141,47 @@ def _fetch_story_topics(db: Database, story_id: str) -> list[str]:
     return [row[0] for row in rows]
 
 
+def _escape_url(url: str) -> str:
+    """Percent-encode characters in *url* that could break markdown link syntax or
+    inject content into LLM context.
+
+    Encodes characters structurally dangerous in the markdown href position:
+    ``)``, ``<``, ``>``, whitespace, and quote characters. Existing
+    percent-encoded sequences are preserved as-is to avoid double-encoding.
+    """
+    _ENCODE = {
+        ')': '%29',
+        '<': '%3C',
+        '>': '%3E',
+        ' ': '%20',
+        '\t': '%09',
+        '\n': '%0A',
+        '\r': '%0D',
+        '"': '%22',
+        "'": '%27',
+    }
+    return "".join(_ENCODE.get(c, c) for c in url)
+
+
+def _escape_md(text: str) -> str:
+    """Escape markdown-significant characters in *text*.
+
+    Escapes square brackets, parentheses, and HTML tag delimiters so that
+    untrusted external content cannot break the markdown link structure or
+    close the <external_data> content fence.
+    """
+    return (
+        text
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("[", r"\[")
+        .replace("]", r"\]")
+        .replace("(", r"\(")
+        .replace(")", r"\)")
+    )
+
+
 def _render_story(story: dict, articles: list[dict], topics: list[str]) -> str:
     """Render a single story as a markdown block.
 
@@ -166,7 +207,7 @@ def _render_story(story: dict, articles: list[dict], topics: list[str]) -> str:
         [(a["source_id"], a["url"]) for a in articles]
     ) if articles else 0
     source_label = "source" if source_count == 1 else "sources"
-    lines.append(f"### {story['title']}")
+    lines.append(f"### {_escape_md(story['title'])}")
     lines.append(f"")
     lines.append(f"⭐ {score:.2f} &nbsp;·&nbsp; {source_count} {source_label}")
 
@@ -180,7 +221,7 @@ def _render_story(story: dict, articles: list[dict], topics: list[str]) -> str:
     if articles:
         lines.append(f"")
         for article in articles:
-            lines.append(f"- [{article['title']}]({article['url']})")
+            lines.append(f"- [{_escape_md(article['title'])}]({_escape_url(article['url'])})")
 
     return "\n".join(lines)
 
