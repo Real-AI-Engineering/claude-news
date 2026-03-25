@@ -1,19 +1,20 @@
-# Herald
-
-<div align="center">
-
-**Local-first news intelligence for AI agents**
-
-![Claude Code Plugin](https://img.shields.io/badge/Claude%20Code-Plugin-5b21b6?style=flat-square)
-![Version](https://img.shields.io/badge/version-2.0.0-5b21b6?style=flat-square)
-![License](https://img.shields.io/badge/license-MIT-5b21b6?style=flat-square)
-
-```bash
-claude plugin marketplace add heurema/emporium
-claude plugin install herald@emporium
+```
+    __                    __    __
+   / /_  ___  _________ _/ /___/ /
+  / __ \/ _ \/ ___/ __ `/ / __  /
+ / / / /  __/ /  / /_/ / / /_/ /
+/_/ /_/\___/_/   \__,_/_/\__,_/
 ```
 
-</div>
+**Local-first news intelligence for AI agents.**
+
+[![Claude Code Plugin](https://img.shields.io/badge/Claude%20Code-Plugin-5b21b6?style=flat-square)]()
+[![Version](https://img.shields.io/badge/version-2.0.0-5b21b6?style=flat-square)]()
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+> Collect, cluster, and rank news from RSS and Hacker News — all locally, no API keys, no cloud.
+
+---
 
 ## What it does
 
