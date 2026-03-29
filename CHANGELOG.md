@@ -1,6 +1,23 @@
-## [2.1.1] - 2026-03-17
+## [2.2.2] - 2026-03-29
+
+### Fixed
+- XDG vs ~/.herald path mismatch between setup.sh and cli.py (#5)
+- Preset resolution: feeds/sources key mismatch, missing id generation (#6)
+- Pipeline preset path resolution to project root
+- run.sh always reporting success status
+- story_type not persisted in clustering
+- URL dedup mismatch for empty paths
+- Tavily API key not read from config
+- Schedule time validation accepting invalid hours
+- systemd scheduler fallback to cron on failure
+- Mirror detection using substring instead of hostname match
+- Topic config shape normalization
+- Command injection in news-add docs
+- Stale path references in command docs
 
 ## [2.2.1] - 2026-03-19
+
+## [2.1.1] - 2026-03-17
 
 ## [2.2.0] - 2026-03-19
 
