@@ -9,7 +9,7 @@
 **Local-first news intelligence for AI agents.**
 
 [![Claude Code Plugin](https://img.shields.io/badge/Claude%20Code-Plugin-5b21b6?style=flat-square)]()
-[![Version](https://img.shields.io/badge/version-2.0.0-5b21b6?style=flat-square)]()
+[![Version](https://img.shields.io/github/v/tag/heurema/herald?label=version&style=flat-square&color=5b21b6)](https://github.com/heurema/herald)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 > Collect, cluster, and rank news from RSS and Hacker News — all locally, no API keys, no cloud.
