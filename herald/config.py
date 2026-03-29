@@ -126,7 +126,7 @@ def load_config_from_string(text: str) -> HeraldConfig:
 
 
 def _parse_config(data: dict) -> HeraldConfig:
-    sources = [_parse_source(s) for s in data.get("sources", [])]
+    sources = [_parse_source(s) for s in data.get("sources", data.get("feeds", []))]
 
     cluster_data = data.get("clustering", {})
     clustering = ClusterConfig(
