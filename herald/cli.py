@@ -1,8 +1,9 @@
 """Herald v2 CLI entry point.
 
 Subcommands: init, run, brief, status
-Data directory: ~/.herald/ (override via --data-dir flag or HERALD_DATA_DIR env var)
---data-dir flag takes precedence over HERALD_DATA_DIR env var.
+Data directory: XDG_DATA_HOME/herald (default ~/.local/share/herald),
+  fallback to ~/.herald for legacy installs.
+Override via --data-dir flag or HERALD_DATA_DIR env var.
 """
 from __future__ import annotations
 
@@ -18,7 +19,15 @@ from herald.pipeline import run_pipeline
 from herald.project import project_brief
 
 
-DEFAULT_DATA_DIR = Path.home() / ".herald"
+def _default_data_dir() -> Path:
+    """Return the default data directory respecting XDG, with ~/.herald fallback."""
+    legacy = Path.home() / ".herald"
+    if legacy.exists():
+        return legacy
+    xdg_data = os.environ.get("XDG_DATA_HOME")
+    if xdg_data:
+        return Path(xdg_data) / "herald"
+    return Path.home() / ".local" / "share" / "herald"
 
 DEFAULT_CONFIG_TEMPLATE = """\
 # Herald configuration
@@ -41,13 +50,13 @@ schedule:
 
 
 def _resolve_data_dir(args: argparse.Namespace) -> Path:
-    """Return data_dir: --data-dir flag > HERALD_DATA_DIR env var > ~/.herald/"""
+    """Return data_dir: --data-dir flag > HERALD_DATA_DIR env var > XDG/legacy default."""
     if args.data_dir is not None:
         return Path(args.data_dir)
     env = os.environ.get("HERALD_DATA_DIR")
     if env:
         return Path(env)
-    return DEFAULT_DATA_DIR
+    return _default_data_dir()
 
 
 def cmd_init(args: argparse.Namespace) -> int:
