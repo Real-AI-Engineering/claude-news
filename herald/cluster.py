@@ -203,7 +203,7 @@ def cluster(db: Database, cfg: ClusterConfig | None = None) -> ClusterResult:
     # Fetch all unclustered articles ordered by collected_at ascending
     unclustered = db.execute(
         """
-        SELECT a.id, a.title, a.collected_at, a.score_base, a.origin_source_id
+        SELECT a.id, a.title, a.collected_at, a.score_base, a.origin_source_id, a.story_type
         FROM articles a
         WHERE a.id NOT IN (SELECT article_id FROM story_articles)
         ORDER BY a.collected_at ASC
@@ -215,6 +215,7 @@ def cluster(db: Database, cfg: ClusterConfig | None = None) -> ClusterResult:
         title = article_row[1]
         collected_at = article_row[2]
         score_base = article_row[3]
+        story_type = article_row[5]
 
         norm = normalize_title(title)
 
@@ -266,10 +267,10 @@ def cluster(db: Database, cfg: ClusterConfig | None = None) -> ClusterResult:
                 db.execute(
                     """
                     INSERT INTO stories
-                        (id, title, score, canonical_article_id, first_seen, last_updated, status)
-                    VALUES (?, ?, ?, ?, ?, ?, 'active')
+                        (id, title, story_type, score, canonical_article_id, first_seen, last_updated, status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 'active')
                     """,
-                    (story_id, title, initial_score, article_id, collected_at, collected_at),
+                    (story_id, title, story_type, initial_score, article_id, collected_at, collected_at),
                 )
                 db.execute(
                     "INSERT INTO story_articles (story_id, article_id) VALUES (?, ?)",
@@ -313,13 +314,22 @@ def cluster(db: Database, cfg: ClusterConfig | None = None) -> ClusterResult:
                 story_last_updated = story["last_updated"]
                 updated_at = max(story_last_updated, collected_at)
 
+                # Fetch title and story_type from canonical article
+                canon_fields = db.execute(
+                    "SELECT title, story_type FROM articles WHERE id = ?",
+                    (new_canonical,),
+                ).fetchone()
+                new_title = canon_fields[0] if canon_fields else story["title"]
+                new_story_type = canon_fields[1] if canon_fields else "news"
+
                 db.execute(
                     """
                     UPDATE stories
-                    SET last_updated = ?, score = ?, canonical_article_id = ?
+                    SET last_updated = ?, score = ?, canonical_article_id = ?,
+                        title = ?, story_type = ?
                     WHERE id = ?
                     """,
-                    (updated_at, new_score, new_canonical, matched_story_id),
+                    (updated_at, new_score, new_canonical, new_title, new_story_type, matched_story_id),
                 )
                 _sync_story_topics(db, matched_story_id)
                 result.stories_updated += 1

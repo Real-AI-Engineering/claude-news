@@ -148,9 +148,9 @@ def fetch_hn(source: Source, *, min_points: int = 100, limit: int = 200, timeout
     return items
 
 
-def fetch_tavily(source: Source, *, queries: list[str] | None = None, timeout: int = 10, retries: int = 3) -> list[RawItem]:
+def fetch_tavily(source: Source, *, queries: list[str] | None = None, timeout: int = 10, retries: int = 3, api_key: str | None = None) -> list[RawItem]:
     """Search via Tavily API. Returns [] silently when TAVILY_API_KEY is not set."""
-    api_key = os.environ.get("TAVILY_API_KEY", "")
+    api_key = api_key or os.environ.get("TAVILY_API_KEY", "")
     if not api_key:
         return []
 
@@ -194,6 +194,7 @@ def collect_all(
     sources: list[Source],
     *,
     adapter_map: dict[str, str] | None = None,
+    tavily_api_key: str | None = None,
 ) -> list[RawItem]:
     """Dispatch fetch per source using adapter_map (source.id -> adapter name).
 
@@ -212,7 +213,10 @@ def collect_all(
             continue
         fetch_fn = getattr(_module, f"fetch_{adapter_name}")
         try:
-            items = fetch_fn(source)
+            kwargs = {}
+            if adapter_name == "tavily" and tavily_api_key:
+                kwargs["api_key"] = tavily_api_key
+            items = fetch_fn(source, **kwargs)
             print(f"[collect] {source.name}: {len(items)} items", file=sys.stderr)
             all_items.extend(items)
         except Exception as exc:
