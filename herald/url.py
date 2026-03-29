@@ -45,6 +45,10 @@ def canonicalize_url(url: str) -> str:
     # Rule 9: percent-decode unreserved chars in path
     path = _decode_unreserved(p.path)
 
+    # Normalize empty path to "/"
+    if not path:
+        path = "/"
+
     # Rule 7: strip trailing slash (except root)
     if path != "/" and path.endswith("/"):
         path = path.rstrip("/")
