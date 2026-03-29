@@ -24,7 +24,7 @@ cd "${CLAUDE_PLUGIN_ROOT}" && PYTHONPATH=. python3 -m herald.cli init
 3. **Configure sources**: Read `config.yaml` from the herald data directory (see step 1) and help user add sources:
    - Ask: "What topics do you follow? (e.g., AI, Rust, DevOps, security)"
    - Based on answer, suggest sources with RSS feeds and HN integration
-   - Edit `~/.herald/config.yaml` to add sources using this format:
+   - Edit the resolved data dir path `config.yaml` (from step 1) to add sources using this format:
      ```yaml
      sources:
        - id: hn
