@@ -127,8 +127,8 @@ EOF
             echo "ERROR: Invalid preset name '$PRESET'. Use only letters, numbers, hyphens, underscores."
             exit 1
         fi
-        # Validate schedule time: HH:MM format
-        if ! [[ "$SCHEDULE_TIME" =~ ^[0-2][0-9]:[0-5][0-9]$ ]]; then
+        # Validate schedule time: HH:MM format (hour 0-23, minute 0-59)
+        if ! [[ "$SCHEDULE_TIME" =~ ^([01][0-9]|2[0-3]):[0-5][0-9]$ ]]; then
             echo "ERROR: Invalid time '$SCHEDULE_TIME'. Use HH:MM format (e.g., 06:00)."
             exit 1
         fi
