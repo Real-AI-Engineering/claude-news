@@ -31,6 +31,7 @@ class HeraldConfig:
     clustering: ClusterConfig = field(default_factory=ClusterConfig)
     schedule: ScheduleConfig = field(default_factory=ScheduleConfig)
     topics: dict = field(default_factory=dict)
+    tavily_api_key: str | None = None
 
 
 _TYPE_ALIASES = {
@@ -131,10 +132,12 @@ def _parse_config(data: dict) -> HeraldConfig:
     )
 
     topics = data.get("topics", {})
+    tavily_api_key = data.get("tavily_api_key") or None
 
     return HeraldConfig(
         sources=sources,
         clustering=clustering,
         schedule=schedule,
         topics=topics,
+        tavily_api_key=tavily_api_key,
     )

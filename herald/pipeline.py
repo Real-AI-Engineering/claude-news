@@ -78,7 +78,11 @@ def run_pipeline(
 
         # Stage 1: collect
         sources_dict = {s.id: s for s in config.sources}
-        raw_items = collect_all(config.sources, adapter_map=adapter_map)
+        raw_items = collect_all(
+            config.sources,
+            adapter_map=adapter_map,
+            tavily_api_key=config.tavily_api_key,
+        )
 
         # Stage 2: ingest
         ingest_result = ingest_items(
