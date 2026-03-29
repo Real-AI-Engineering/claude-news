@@ -159,7 +159,15 @@ def _install_systemd(run_sh_path: str, time: str) -> bool:
         ["systemctl", "--user", "enable", "--now", _SYSTEMD_TIMER],
         capture_output=True,
     )
-    return result.returncode == 0
+    if result.returncode != 0:
+        # Clean up stale unit files so get_scheduler_status() won't report false positives
+        for f in (_SYSTEMD_SERVICE, _SYSTEMD_TIMER):
+            p = d / f
+            if p.exists():
+                p.unlink()
+        subprocess.run(["systemctl", "--user", "daemon-reload"], capture_output=True)
+        return False
+    return True
 
 
 def _uninstall_systemd() -> bool:
